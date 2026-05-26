@@ -1,0 +1,19 @@
+Options -Indexes
+
+RewriteEngine On
+
+# Protect sensitive files
+<Files ".env">
+    Require all denied
+</Files>
+
+<FilesMatch "^(composer\.json|composer\.lock|package\.json|package-lock\.json)$">
+    Require all denied
+</FilesMatch>
+
+# Let real files/folders be served directly, including /sites
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Remove index.php from CI3 URL
+RewriteRule ^(.*)$ index.php/$1 [L]

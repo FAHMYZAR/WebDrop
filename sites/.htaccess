@@ -1,0 +1,6 @@
+Options -Indexes
+DirectoryIndex index.html
+
+<FilesMatch "\.(php|phtml|phar|cgi|pl|py|sh|exe|bat|cmd)$">
+    Require all denied
+</FilesMatch>
