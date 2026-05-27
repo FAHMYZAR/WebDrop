@@ -62,33 +62,21 @@ $route['dashboard'] = 'dashboard/index';
 $route['projects/create'] = 'projects/create';
 $route['projects/delete_project'] = 'projects/delete_project';
 $route['projects/editor/(:num)'] = 'projects/editor/$1';
-$route['projects/get_file_content'] = 'projects/get_file_content';
-$route['projects/save_file'] = 'projects/save_file';
-$route['projects/create_file'] = 'projects/create_file';
-$route['projects/create_folder'] = 'projects/create_folder';
-$route['projects/rename_file'] = 'projects/rename_file';
-$route['projects/delete_file'] = 'projects/delete_file';
-$route['projects/upload_file'] = 'projects/upload_file';
-$route['projects/preview/(:num)'] = 'projects/preview/$1';
-$route['projects/preview/(:num)/(.*)'] = 'projects/preview/$1/$2';
-$route['projects/preview/(:num)/(:any)'] = 'projects/preview/$1/$2';
-$route['projects/publish/(:num)'] = 'projects/publish/$1';
-$route['projects/savedraft'] = 'projects/savedraft';
 $route['projects/(:any)'] = 'projects/show/$1';
-
-$route['editor/(:num)'] = 'projects/editor/$1';
-$route['editor/(:num)/file'] = 'projects/get_file_content';
-$route['editor/(:num)/save'] = 'projects/save_file';
-$route['editor/(:num)/create-file'] = 'projects/create_file';
-$route['editor/(:num)/create-folder'] = 'projects/create_folder';
-$route['editor/(:num)/rename'] = 'projects/rename_file';
-$route['editor/(:num)/delete'] = 'projects/delete_file';
-$route['editor/(:num)/upload'] = 'projects/upload_file';
-
-$route['publish/(:num)'] = 'projects/publish/$1';
+$route['project-files/get-file-content'] = 'ProjectFiles/get_file_content';
+$route['project-files/save-file'] = 'ProjectFiles/save_file';
+$route['project-files/create-file'] = 'ProjectFiles/create_file';
+$route['project-files/create-folder'] = 'ProjectFiles/create_folder';
+$route['project-files/rename-file'] = 'ProjectFiles/rename_file';
+$route['project-files/delete-file'] = 'ProjectFiles/delete_file';
+$route['project-files/upload-file'] = 'ProjectFiles/upload_file';
+$route['project-preview/(:num)'] = 'ProjectPreview/index/$1';
+$route['project-preview/(:num)/(.*)'] = 'ProjectPreview/index/$1/$2';
+$route['project-publish/(:num)'] = 'ProjectPublish/publish/$1';
+$route['project-publish/savedraft'] = 'ProjectPublish/savedraft';
 
 $route['profile'] = 'profile/index';
 $route['profile/password'] = 'profile/password';
 
-$route['preview/(:num)'] = 'site/preview/$1';
-$route['preview/(:num)/(.*)'] = 'site/preview/$1/$2';
+$route['site/(:any)/(:any)'] = 'site/view/$1/$2';
+$route['site/(:any)/(:any)/(.*)'] = 'site/view/$1/$2/$3';

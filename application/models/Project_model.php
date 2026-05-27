@@ -19,7 +19,7 @@ class Project_model extends CI_Model
             ->update($this->table, $data);
     }
 
-    public function createWithProcedure($userId, $projectName, $slug, $workspacePath)
+    public function createProject($userId, $projectName, $slug, $workspacePath)
     {
         return $this->create(array(
             'id_user' => (int) $userId,

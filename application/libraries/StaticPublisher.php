@@ -30,7 +30,13 @@ class StaticPublisher
 
             $publicUrl = $this->CI->pathresolver->publicUrl($user->username, $project->slug);
             $this->CI->Project_model->markPublished($project->id_project, $user->id_user, $siteDirectory, $publicUrl);
-            $this->CI->Activity_log_model->create($user->id_user, 'publish_project', 'Project dipublish ke ' . $publicUrl, $project->id_project);
+
+            try {
+                $this->CI->Activity_log_model->create($user->id_user, 'publish_project', 'Project dipublish ke ' . $publicUrl, $project->id_project);
+            } catch (Throwable $exception) {
+                log_message('error', 'Publish activity log failed: ' . $exception->getMessage());
+            }
+
             $this->CI->Publish_job_model->finish($jobId, 'success', 'Publish berhasil.');
 
             return $publicUrl;
@@ -63,12 +69,13 @@ class StaticPublisher
 
     protected function replaceDirectory($sourceDirectory, $targetDirectory)
     {
-        if (is_dir($targetDirectory)) {
-            $this->deleteDirectory($targetDirectory);
-        }
+        $targetDirectory = rtrim($targetDirectory, DIRECTORY_SEPARATOR);
+        $stagingDirectory = $targetDirectory . '.staging-' . uniqid();
+        $backupDirectory = $targetDirectory . '.backup-' . uniqid();
+        $targetExists = is_dir($targetDirectory);
 
-        if ( ! mkdir($targetDirectory, DIR_WRITE_MODE, true) && ! is_dir($targetDirectory)) {
-            throw new RuntimeException('Gagal membuat folder publish.');
+        if ( ! mkdir($stagingDirectory, DIR_WRITE_MODE, true) && ! is_dir($stagingDirectory)) {
+            throw new RuntimeException('Gagal membuat folder publish sementara.');
         }
 
         $iterator = new RecursiveIteratorIterator(
@@ -78,7 +85,7 @@ class StaticPublisher
 
         foreach ($iterator as $item) {
             $relativePath = str_replace(rtrim($sourceDirectory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR, '', $item->getPathname());
-            $targetPath = rtrim($targetDirectory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $relativePath;
+            $targetPath = rtrim($stagingDirectory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $relativePath;
 
             if ($item->isDir()) {
                 if ( ! is_dir($targetPath) && ! mkdir($targetPath, DIR_WRITE_MODE, true) && ! is_dir($targetPath)) {
@@ -87,7 +94,30 @@ class StaticPublisher
                 continue;
             }
 
-            copy($item->getPathname(), $targetPath);
+            if ( ! copy($item->getPathname(), $targetPath)) {
+                $this->deleteDirectory($stagingDirectory);
+                throw new RuntimeException('Gagal menyalin file publish.');
+            }
+        }
+
+        if ($targetExists) {
+            if ( ! rename($targetDirectory, $backupDirectory)) {
+                $this->deleteDirectory($stagingDirectory);
+                throw new RuntimeException('Gagal menyiapkan folder publish lama.');
+            }
+        }
+
+        if ( ! rename($stagingDirectory, $targetDirectory)) {
+            if ($targetExists && is_dir($backupDirectory)) {
+                rename($backupDirectory, $targetDirectory);
+            }
+
+            $this->deleteDirectory($stagingDirectory);
+            throw new RuntimeException('Gagal mengaktifkan folder publish.');
+        }
+
+        if ($targetExists && is_dir($backupDirectory)) {
+            $this->deleteDirectory($backupDirectory);
         }
     }
 

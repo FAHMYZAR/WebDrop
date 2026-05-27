@@ -8,13 +8,13 @@ class FileManagerService
     public function __construct()
     {
         $this->CI =& get_instance();
-        $this->CI->load->model(array('Project_file_model', 'Allowed_file_type_model'));
+        $this->CI->load->model(array('File_model', 'Allowed_file_type_model'));
         $this->CI->load->library(array('PathResolver', 'FileValidator'));
     }
 
     public function tree($project)
     {
-        return $this->CI->Project_file_model->findByProject($project->id_project);
+        return $this->CI->File_model->findByProject($project->id_project);
     }
 
     public function projectAbsolutePath($project, $relativePath = '')
@@ -30,7 +30,7 @@ class FileManagerService
     {
         $relativePath = $this->CI->pathresolver->normalizeRelativePath($relativePath);
 
-        return $this->CI->Project_file_model->findByProjectAndPath($project->id_project, $relativePath);
+        return $this->CI->File_model->findByProjectAndPath($project->id_project, $relativePath);
     }
 
     public function readFile($project, $relativePath)
@@ -110,7 +110,10 @@ class FileManagerService
         $parent = dirname($relativePath);
         $parent = $parent === '.' ? '' : str_replace('\\', '/', $parent);
         $targetRelativePath = $this->joinPath($parent, $newName);
-        $this->CI->filevalidator->assertManagedExtension($targetRelativePath);
+
+        if ( ! is_dir($sourcePath)) {
+            $this->CI->filevalidator->assertManagedExtension($targetRelativePath);
+        }
 
         $targetPath = $this->projectAbsolutePath($project, $targetRelativePath);
 
@@ -208,7 +211,7 @@ class FileManagerService
         });
 
         $this->CI->db->trans_start();
-        $this->CI->Project_file_model->deleteByProject($project->id_project);
+        $this->CI->File_model->deleteByProject($project->id_project);
         $pathMap = array();
 
         foreach ($items as $item) {

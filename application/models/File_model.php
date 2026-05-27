@@ -1,7 +1,7 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
-class Project_file_model extends CI_Model
+class File_model extends CI_Model
 {
     protected $table = 'project_files';
 

@@ -1,32 +1,31 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
-class Site extends App_Controller
+class Site extends Public_Controller
 {
     public function __construct()
     {
         parent::__construct();
         $this->load->model('Project_model');
-        $this->load->library('PathResolver');
-        $this->load->helper('file');
+        $this->load->model('User_model');
         $this->load->config('mimes');
     }
 
-    public function preview($projectId, $relativePath = '')
+    public function view($username, $slug, $relativePath = '')
     {
-        $project = $this->Project_model->findByUserAndId($this->user()->id_user, $projectId);
+        $project = $this->Project_model->findByUserAndSlug($this->resolveUserId($username), $slug);
 
-        if ( ! $project) {
+        if ( ! $project || $project->status !== 'published' || empty($project->published_path)) {
             show_404();
         }
 
         try {
             $relativePath = $relativePath === '' ? 'index.html' : $relativePath;
-            $relativePath = $this->pathresolver->normalizeRelativePath($relativePath);
-            $absolutePath = $this->pathresolver->absolutePath($project->workspace_path, $relativePath);
+            $relativePath = $this->sanitizeRelativePath($relativePath);
+            $absolutePath = rtrim($project->published_path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
 
             if ( ! is_file($absolutePath)) {
-                $this->renderNotFoundPage($project);
+                $this->renderNotFoundPage();
                 return;
             }
 
@@ -34,8 +33,8 @@ class Site extends App_Controller
             $mime = $this->resolveMimeType($extension);
             $content = file_get_contents($absolutePath);
 
-            if ($extension === 'html') {
-                $content = $this->injectBaseHref($content, site_url('preview/' . $project->id_project . '/'));
+            if ($extension === 'html' || $extension === 'htm') {
+                $content = $this->injectBaseHref($content, site_url('site/' . rawurlencode($username) . '/' . rawurlencode($slug) . '/'));
             }
 
             $this->output
@@ -46,14 +45,49 @@ class Site extends App_Controller
         }
     }
 
-    protected function renderNotFoundPage($project)
+    protected function resolveUserId($username)
+    {
+        $user = $this->User_model->findByUsername($username);
+
+        if ( ! $user || (int) $user->is_active !== 1) {
+            return 0;
+        }
+
+        return (int) $user->id_user;
+    }
+
+    protected function sanitizeRelativePath($relativePath)
+    {
+        $relativePath = trim((string) $relativePath);
+
+        if ($relativePath === '') {
+            return 'index.html';
+        }
+
+        if (preg_match('/^[A-Za-z]:[\\\/]/', $relativePath) || $relativePath[0] === '/' || strpos($relativePath, '\\') !== false) {
+            throw new RuntimeException('Path tidak valid.');
+        }
+
+        $relativePath = trim($relativePath, '/');
+        $segments = array();
+
+        foreach (explode('/', $relativePath) as $segment) {
+            $segment = trim($segment);
+
+            if ($segment === '' || $segment === '.' || $segment === '..' || preg_match('/[<>:"|?*]/', $segment)) {
+                throw new RuntimeException('Path tidak valid.');
+            }
+
+            $segments[] = $segment;
+        }
+
+        return implode('/', $segments);
+    }
+
+    protected function renderNotFoundPage()
     {
         $notFoundFile = FCPATH . 'sites' . DIRECTORY_SEPARATOR . '404.html';
         $content = is_file($notFoundFile) ? file_get_contents($notFoundFile) : '';
-
-        if ($content === '') {
-            $content = '<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>WebDrop - 404</title><style>body{margin:0;font-family:Arial,sans-serif;background:#f4f4f4;color:#161616;min-height:100vh;display:flex;align-items:center;justify-content:center} .wrap{max-width:640px;width:calc(100% - 32px);background:#fff;border:1px solid #e0e0e0;box-shadow:0 18px 50px rgba(0,0,0,.08);padding:32px} .kicker{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#0f62fe;font-weight:700} h1{margin:12px 0 8px;font-size:32px;line-height:1.1} p{margin:0;color:#525252;line-height:1.6}</style></head><body><main class="wrap"><div class="kicker">WebDrop 404</div><h1>OOPS, halaman tidak ditemukan</h1><p>Halaman yang kamu cari tidak tersedia atau sudah dipindah.</p></main></body></html>';
-        }
 
         $this->output
             ->set_status_header(404)
@@ -67,24 +101,5 @@ class Site extends App_Controller
         $mime = isset($mimes[$extension]) ? $mimes[$extension] : 'text/plain';
 
         return is_array($mime) ? $mime[0] : $mime;
-    }
-
-    protected function injectBaseHref($content, $baseHref)
-    {
-        if (stripos($content, '<base ') !== false) {
-            return $content;
-        }
-
-        $baseTag = '<base href="' . html_escape($baseHref) . '">';
-
-        if (preg_match('/<head[^>]*>/i', $content)) {
-            return preg_replace('/<head([^>]*)>/i', '<head$1>' . $baseTag, $content, 1);
-        }
-
-        if (preg_match('/<html[^>]*>/i', $content)) {
-            return preg_replace('/<html([^>]*)>/i', '<html$1><head>' . $baseTag . '</head>', $content, 1);
-        }
-
-        return '<!doctype html><html><head>' . $baseTag . '</head><body>' . $content . '</body></html>';
     }
 }

@@ -5,7 +5,7 @@
     </div>
     <div class="plain-actions">
         <a class="secondary-link" href="<?php echo site_url('dashboard'); ?>">Kembali</a>
-        <a class="primary-link" href="<?php echo site_url('editor/' . $project->id_project); ?>">Buka Editor</a>
+        <a class="primary-link" href="<?php echo site_url('projects/editor/' . $project->id_project); ?>">Buka Editor</a>
     </div>
 </section>
 
