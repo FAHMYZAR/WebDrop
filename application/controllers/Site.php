@@ -26,7 +26,8 @@ class Site extends App_Controller
             $absolutePath = $this->pathresolver->absolutePath($project->workspace_path, $relativePath);
 
             if ( ! is_file($absolutePath)) {
-                show_404();
+                $this->renderNotFoundPage($project);
+                return;
             }
 
             $extension = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
@@ -43,6 +44,21 @@ class Site extends App_Controller
         } catch (Throwable $exception) {
             show_error($exception->getMessage(), 422);
         }
+    }
+
+    protected function renderNotFoundPage($project)
+    {
+        $notFoundFile = FCPATH . 'sites' . DIRECTORY_SEPARATOR . '404.html';
+        $content = is_file($notFoundFile) ? file_get_contents($notFoundFile) : '';
+
+        if ($content === '') {
+            $content = '<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>WebDrop - 404</title><style>body{margin:0;font-family:Arial,sans-serif;background:#f4f4f4;color:#161616;min-height:100vh;display:flex;align-items:center;justify-content:center} .wrap{max-width:640px;width:calc(100% - 32px);background:#fff;border:1px solid #e0e0e0;box-shadow:0 18px 50px rgba(0,0,0,.08);padding:32px} .kicker{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#0f62fe;font-weight:700} h1{margin:12px 0 8px;font-size:32px;line-height:1.1} p{margin:0;color:#525252;line-height:1.6}</style></head><body><main class="wrap"><div class="kicker">WebDrop 404</div><h1>OOPS, halaman tidak ditemukan</h1><p>Halaman yang kamu cari tidak tersedia atau sudah dipindah.</p></main></body></html>';
+        }
+
+        $this->output
+            ->set_status_header(404)
+            ->set_content_type('text/html', 'UTF-8')
+            ->set_output($content);
     }
 
     protected function resolveMimeType($extension)

@@ -5,24 +5,6 @@ class Project_model extends CI_Model
 {
     protected $table = 'projects';
 
-    protected function procedureExists($procedureName)
-    {
-        try {
-            $row = $this->db
-                ->select('COUNT(*) AS total', false)
-                ->from('information_schema.routines')
-                ->where('routine_schema', $this->db->database)
-                ->where('routine_name', $procedureName)
-                ->where('routine_type', 'PROCEDURE')
-                ->get()
-                ->row();
-
-            return $row && (int) $row->total > 0;
-        } catch (Throwable $exception) {
-            return false;
-        }
-    }
-
     public function create(array $data)
     {
         $this->db->insert($this->table, $data);
@@ -30,19 +12,15 @@ class Project_model extends CI_Model
         return $this->findById($this->db->insert_id());
     }
 
+    public function update($projectId, array $data)
+    {
+        return $this->db
+            ->where('id_project', (int) $projectId)
+            ->update($this->table, $data);
+    }
+
     public function createWithProcedure($userId, $projectName, $slug, $workspacePath)
     {
-        if ($this->procedureExists('sp_create_project')) {
-            $this->db->query('CALL sp_create_project(?, ?, ?, ?)', array(
-                (int) $userId,
-                $projectName,
-                $slug,
-                $workspacePath,
-            ));
-
-            return $this->findByUserAndSlug($userId, $slug);
-        }
-
         return $this->create(array(
             'id_user' => (int) $userId,
             'project_name' => $projectName,
@@ -109,17 +87,6 @@ class Project_model extends CI_Model
 
     public function markPublished($projectId, $userId, $publishedPath, $publicUrl)
     {
-        if ($this->procedureExists('sp_mark_project_published')) {
-            $this->db->query('CALL sp_mark_project_published(?, ?, ?, ?)', array(
-                (int) $projectId,
-                $publishedPath,
-                $publicUrl,
-                (int) $userId,
-            ));
-
-            return true;
-        }
-
         return $this->db
             ->where('id_project', (int) $projectId)
             ->where('id_user', (int) $userId)
@@ -138,4 +105,5 @@ class Project_model extends CI_Model
             ->where('id_user', (int) $userId)
             ->delete($this->table);
     }
+
 }

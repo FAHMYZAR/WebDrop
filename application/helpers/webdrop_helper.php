@@ -45,8 +45,6 @@ if ( ! function_exists('project_status_class')) {
         switch ($status) {
             case 'published':
                 return 'is-success';
-            case 'modified':
-                return 'is-warning';
             default:
                 return 'is-muted';
         }

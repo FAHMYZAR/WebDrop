@@ -159,8 +159,13 @@
             return;
         }
 
-        const baseUrl = previewFrame.dataset.src || previewFrame.getAttribute('src') || config.previewUrl;
-        previewFrame.setAttribute('src', baseUrl.split('?')[0] + '?t=' + Date.now());
+        const baseUrl = previewFrame.dataset.src || config.previewUrl;
+
+        if (!baseUrl) {
+            return;
+        }
+
+        previewFrame.setAttribute('src', baseUrl + '?t=' + Date.now());
         state.previewDirty = false;
     };
 
@@ -1012,6 +1017,57 @@
             iconsReady();
         }
     }));
+
+    // Dropdown publish functionality
+    const publishDropdown = root.querySelector('[data-publish-dropdown]');
+    const publishToggle = root.querySelector('[data-publish-toggle]');
+    const publishMenu = root.querySelector('[data-publish-menu]');
+
+    publishToggle?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        publishMenu?.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+        if (publishDropdown && !publishDropdown.contains(e.target)) {
+            publishMenu?.classList.add('hidden');
+        }
+    });
+
+    root.querySelectorAll('[data-publish-now]').forEach((button) => button.addEventListener('click', async () => {
+        publishMenu?.classList.add('hidden');
+        try {
+            button.disabled = true;
+            const formData = new FormData();
+            formData.set('id_project', projectId);
+            const payload = await requestJSON(endpoints.publish, formData);
+            showToast(payload.message);
+            openPublishModal(payload.data.public_url);
+        } catch (error) {
+            showToast(error.message, 'error');
+        } finally {
+            button.disabled = false;
+        }
+    }));
+
+    root.querySelectorAll('[data-save-draft]').forEach((button) => button.addEventListener('click', async () => {
+        publishMenu?.classList.add('hidden');
+        try {
+            button.disabled = true;
+            const formData = new FormData();
+            formData.set('id_project', projectId);
+            const payload = await requestJSON(endpoints.saveDraft, formData);
+            showToast(payload.message);
+            setTimeout(() => {
+                window.location.href = config.dashboardUrl || '/dashboard';
+            }, 1000);
+        } catch (error) {
+            showToast(error.message, 'error');
+        } finally {
+            button.disabled = false;
+        }
+    }));
+
     root.querySelectorAll('[data-copy-public-url]').forEach((button) => button.addEventListener('click', async () => {
         if (!publishUrlNode) return;
         await copyText(publishUrlNode.textContent || publishUrlNode.href);

@@ -1,5 +1,6 @@
 Options -Indexes
 DirectoryIndex index.html
+ErrorDocument 404 /sites/404.html
 
 <FilesMatch "\.(php|phtml|phar|cgi|pl|py|sh|exe|bat|cmd)$">
     Require all denied

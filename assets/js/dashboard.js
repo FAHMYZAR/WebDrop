@@ -100,6 +100,11 @@
     };
 
     const submitForm = async (url, formData) => {
+        const csrfName = document.querySelector('meta[name="csrf-token-name"]')?.getAttribute('content') || config.csrfName;
+        const csrfHash = document.querySelector('meta[name="csrf-token-hash"]')?.getAttribute('content') || config.csrfHash;
+
+        config.csrfName = csrfName;
+        config.csrfHash = csrfHash;
         formData.set(config.csrfName, config.csrfHash);
         const response = await fetch(url, {
             method: 'POST',

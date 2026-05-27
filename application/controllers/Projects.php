@@ -15,7 +15,8 @@ class Projects extends App_Controller
     public function create()
     {
         if ($this->input->method() !== 'post') {
-            show_404();
+            $this->jsonResponse(false, 'Method not allowed.', array(), 405);
+            return;
         }
 
         try {
@@ -34,7 +35,8 @@ class Projects extends App_Controller
     public function delete_project()
     {
         if ($this->input->method() !== 'post') {
-            show_404();
+            $this->jsonResponse(false, 'Method not allowed.', array(), 405);
+            return;
         }
 
         try {
@@ -43,7 +45,7 @@ class Projects extends App_Controller
             $this->projectmanager->deleteProject($project, $this->user());
             $this->jsonResponse(true, 'Project berhasil dihapus.');
         } catch (Throwable $exception) {
-            $this->jsonResponse(false, $exception->getMessage(), array(), 422);
+            $this->jsonResponse(false, $exception->getMessage(), array(), 500);
         }
     }
 
@@ -84,7 +86,8 @@ class Projects extends App_Controller
     public function get_file_content()
     {
         if ($this->input->method() !== 'get') {
-            show_404();
+            $this->jsonResponse(false, 'Method not allowed.', array(), 405);
+            return;
         }
 
         try {
@@ -116,7 +119,8 @@ class Projects extends App_Controller
     public function save_file()
     {
         if ($this->input->method() !== 'post') {
-            show_404();
+            $this->jsonResponse(false, 'Method not allowed.', array(), 405);
+            return;
         }
 
         try {
@@ -137,7 +141,8 @@ class Projects extends App_Controller
     public function create_file()
     {
         if ($this->input->method() !== 'post') {
-            show_404();
+            $this->jsonResponse(false, 'Method not allowed.', array(), 405);
+            return;
         }
 
         try {
@@ -160,7 +165,8 @@ class Projects extends App_Controller
     public function create_folder()
     {
         if ($this->input->method() !== 'post') {
-            show_404();
+            $this->jsonResponse(false, 'Method not allowed.', array(), 405);
+            return;
         }
 
         try {
@@ -183,7 +189,8 @@ class Projects extends App_Controller
     public function rename_file()
     {
         if ($this->input->method() !== 'post') {
-            show_404();
+            $this->jsonResponse(false, 'Method not allowed.', array(), 405);
+            return;
         }
 
         try {
@@ -206,7 +213,8 @@ class Projects extends App_Controller
     public function delete_file()
     {
         if ($this->input->method() !== 'post') {
-            show_404();
+            $this->jsonResponse(false, 'Method not allowed.', array(), 405);
+            return;
         }
 
         try {
@@ -222,7 +230,8 @@ class Projects extends App_Controller
     public function upload_file()
     {
         if ($this->input->method() !== 'post') {
-            show_404();
+            $this->jsonResponse(false, 'Method not allowed.', array(), 405);
+            return;
         }
 
         try {
@@ -248,23 +257,24 @@ class Projects extends App_Controller
         $project = $this->requireProject((int) $projectId);
 
         try {
-            $relativePath = 'index.html';
+            $relativePath = $relativePath === '' ? 'index.html' : $relativePath;
+            $relativePath = $this->pathresolver->normalizeRelativePath($relativePath);
             $absolutePath = $this->filemanagerservice->projectAbsolutePath($project, $relativePath);
 
             if ( ! is_file($absolutePath)) {
-                $this->output
-                    ->set_status_header(404)
-                    ->set_content_type('text/html', 'UTF-8')
-                    ->set_output('<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Preview</title><style>body{font-family:Arial,sans-serif;margin:0;display:flex;min-height:100vh;align-items:center;justify-content:center;background:#fff;color:#161616}div{border:1px solid #e0e0e0;padding:24px 28px}</style></head><body><div>index.html tidak ditemukan.</div></body></html>');
-
+                $this->servePreviewNotFound($relativePath);
                 return;
             }
 
             $content = file_get_contents($absolutePath);
-            $content = $this->injectBaseHref($content, site_url('projects/preview/' . $project->id_project . '/'));
+            $extension = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
+
+            if ($extension === 'html' || $extension === 'htm') {
+                $content = $this->injectBaseHref($content, site_url('projects/preview/' . $project->id_project . '/'));
+            }
 
             $this->output
-                ->set_content_type('text/html', 'UTF-8')
+                ->set_content_type($this->previewMimeType($extension), $this->previewCharset($extension))
                 ->set_output($content);
         } catch (Throwable $exception) {
             $this->output
@@ -274,10 +284,80 @@ class Projects extends App_Controller
         }
     }
 
+    protected function servePreviewNotFound($relativePath)
+    {
+        $extension = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
+
+        if ($extension === 'html' || $extension === 'htm' || $extension === '') {
+            $this->output
+                ->set_status_header(404)
+                ->set_content_type('text/html', 'UTF-8')
+                ->set_output('<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Preview</title><style>body{font-family:Arial,sans-serif;margin:0;display:flex;min-height:100vh;align-items:center;justify-content:center;background:#fff;color:#161616}div{border:1px solid #e0e0e0;padding:24px 28px}</style></head><body><div>File tidak ditemukan.</div></body></html>');
+
+            return;
+        }
+
+        $this->output
+            ->set_status_header(404)
+            ->set_content_type($this->previewMimeType($extension), $this->previewCharset($extension))
+            ->set_output('');
+    }
+
+    protected function previewMimeType($extension)
+    {
+        switch (strtolower($extension)) {
+            case 'html':
+            case 'htm':
+                return 'text/html';
+            case 'css':
+                return 'text/css';
+            case 'js':
+                return 'application/javascript';
+            case 'json':
+                return 'application/json';
+            case 'txt':
+                return 'text/plain';
+            case 'xml':
+                return 'application/xml';
+            case 'svg':
+                return 'image/svg+xml';
+            case 'png':
+                return 'image/png';
+            case 'jpg':
+            case 'jpeg':
+                return 'image/jpeg';
+            case 'gif':
+                return 'image/gif';
+            case 'webp':
+                return 'image/webp';
+            case 'ico':
+                return 'image/x-icon';
+            default:
+                return 'application/octet-stream';
+        }
+    }
+
+    protected function previewCharset($extension)
+    {
+        switch (strtolower($extension)) {
+            case 'html':
+            case 'htm':
+            case 'css':
+            case 'js':
+            case 'json':
+            case 'txt':
+            case 'xml':
+                return 'UTF-8';
+            default:
+                return null;
+        }
+    }
+
     public function publish($projectId)
     {
         if ($this->input->method() !== 'post') {
-            show_404();
+            $this->jsonResponse(false, 'Method not allowed.', array(), 405);
+            return;
         }
 
         try {
@@ -287,6 +367,28 @@ class Projects extends App_Controller
 
             $this->jsonResponse(true, 'Project published successfully!', array(
                 'public_url' => $publicUrl,
+                'project' => $this->projectPayload($updatedProject),
+            ));
+        } catch (Throwable $exception) {
+            $this->jsonResponse(false, $exception->getMessage(), array(), 422);
+        }
+    }
+
+    public function savedraft()
+    {
+        if ($this->input->method() !== 'post') {
+            $this->jsonResponse(false, 'Method not allowed.', array(), 405);
+            return;
+        }
+
+        try {
+            $project = $this->requireProject((int) $this->input->post('id_project'));
+
+            $this->projectmanager->unpublishProject($project);
+            
+            $updatedProject = $this->Project_model->findById($project->id_project);
+
+            $this->jsonResponse(true, 'Project saved as draft.', array(
                 'project' => $this->projectPayload($updatedProject),
             ));
         } catch (Throwable $exception) {
@@ -315,7 +417,7 @@ class Projects extends App_Controller
         $project = $this->Project_model->findByUserAndId($this->user()->id_user, $projectId);
 
         if ( ! $project) {
-            show_404();
+            throw new RuntimeException('Project tidak ditemukan.');
         }
 
         return $project;

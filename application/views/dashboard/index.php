@@ -30,8 +30,7 @@ $deleteUrl = site_url('projects/delete_project');
                 <div class="inline-flex overflow-hidden border border-[#e0e0e0] bg-white text-sm font-medium text-[#525252]" data-project-filter-group>
                     <button type="button" data-project-filter="all" class="border-r border-[#e0e0e0] px-3 py-2 hover:bg-[#f4f4f4] data-[active=true]:bg-[#f4f4f4] data-[active=true]:text-[#161616]">All</button>
                     <button type="button" data-project-filter="draft" class="border-r border-[#e0e0e0] px-3 py-2 hover:bg-[#f4f4f4] data-[active=true]:bg-[#f4f4f4] data-[active=true]:text-[#161616]">Draft</button>
-                    <button type="button" data-project-filter="published" class="border-r border-[#e0e0e0] px-3 py-2 hover:bg-[#f4f4f4] data-[active=true]:bg-[#f4f4f4] data-[active=true]:text-[#161616]">Published</button>
-                    <button type="button" data-project-filter="modified" class="px-3 py-2 hover:bg-[#f4f4f4] data-[active=true]:bg-[#f4f4f4] data-[active=true]:text-[#161616]">Modified</button>
+                    <button type="button" data-project-filter="published" class="px-3 py-2 hover:bg-[#f4f4f4] data-[active=true]:bg-[#f4f4f4] data-[active=true]:text-[#161616]">Published</button>
                 </div>
                 <select data-project-sort class="border border-[#e0e0e0] bg-white px-3 py-2 text-sm text-[#525252] outline-none focus:border-[#0f62fe]">
                     <option value="latest">Latest updated</option>
@@ -50,15 +49,12 @@ $deleteUrl = site_url('projects/delete_project');
         </section>
     <?php else: ?>
         <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" data-project-grid>
-            <button type="button" data-create-project class="group flex min-h-[230px] flex-col border border-dashed border-[#e0e0e0] bg-white p-5 text-left transition hover:border-[#0f62fe] hover:bg-[#f4f4f4]">
-                <div class="flex items-center justify-between gap-3">
-                    <span class="flex h-10 w-10 items-center justify-center border border-[#0f62fe] bg-[#0f62fe] text-white transition group-hover:bg-[#0353e9]"><i data-lucide="plus" class="h-4 w-4"></i></span>
-                    <span class="text-xs font-semibold uppercase tracking-[0.18em] text-[#8d8d8d]">New</span>
+            <button type="button" data-create-project class="group flex min-h-[230px] flex-col items-center justify-center border border-dashed border-[#c6c6c6] bg-white p-5 text-center transition hover:border-[#0f62fe] hover:bg-[#f9f9f9]">
+                <div class="flex h-12 w-12 items-center justify-center bg-[#0f62fe] text-white transition group-hover:bg-[#0353e9]">
+                    <i data-lucide="plus" class="h-6 w-6"></i>
                 </div>
-                <div class="mt-6 space-y-2">
-                    <h3 class="text-base font-semibold text-[#161616]">Create Project</h3>
-                    <p class="text-sm text-[#525252]">Mulai workspace website statis baru.</p>
-                </div>
+                <h3 class="mt-4 text-base font-semibold text-[#161616]">Buat Project</h3>
+                <p class="mt-1 text-sm text-[#8d8d8d]">Mulai <span class="bg-[#0f62fe] px-1.5 text-white">project baru</span></p>
             </button>
 
             <?php foreach ($projects as $project): ?>
@@ -67,22 +63,30 @@ $deleteUrl = site_url('projects/delete_project');
                     $statusLabel = isset($project->status_label) ? $project->status_label : ucfirst($status);
                     $badgeClasses = array(
                         'published' => 'border border-[#24a148] bg-white text-[#24a148]',
-                        'modified' => 'border border-[#f1c21b] bg-white text-[#161616]',
                         'draft' => 'border border-[#e0e0e0] bg-white text-[#525252]',
                     );
                     $badgeClass = isset($badgeClasses[$status]) ? $badgeClasses[$status] : $badgeClasses['draft'];
                 ?>
                 <article class="group flex min-h-[230px] flex-col overflow-visible border border-[#e0e0e0] bg-white" data-project-card data-project-id="<?php echo (int) $project->id_project; ?>" data-public-url="<?php echo html_escape($project->public_url); ?>" data-project-name="<?php echo html_escape($project->project_name); ?>" data-project-status="<?php echo html_escape($status); ?>" data-project-updated-ts="<?php echo (int) strtotime($project->updated_at); ?>">
-                    <div class="relative h-24 overflow-hidden border-b border-[#e0e0e0] bg-[#f4f4f4]">
-                        <div class="absolute inset-0 flex items-center justify-center text-[#8d8d8d]">
-                            <div class="flex h-12 w-12 items-center justify-center border border-[#e0e0e0] bg-white text-[#0f62fe]"><i data-lucide="layout-grid" class="h-5 w-5"></i></div>
-                        </div>
+                    <div class="relative h-32 overflow-hidden border-b border-[#e0e0e0]">
+                        <?php if ( ! empty($project->public_url)): ?>
+                            <div class="absolute inset-0 bg-gradient-to-br from-[#0f62fe]/10 via-[#0f62fe]/5 to-transparent">
+                                <div class="absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-white/80 text-[#0f62fe]">
+                                    <i data-lucide="globe" class="h-5 w-5"></i>
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <div class="absolute inset-0 bg-gradient-to-br from-[#f4f4f4] to-[#e0e0e0]">
+                                <div class="absolute inset-0 flex items-center justify-center text-[#8d8d8d]">
+                                    <i data-lucide="file-code" class="h-8 w-8"></i>
+                                </div>
+                            </div>
+                        <?php endif; ?>
                     </div>
                     <div class="flex flex-1 flex-col gap-3 p-4">
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0">
                                 <h3 class="truncate text-base font-semibold text-[#161616]"><?php echo html_escape($project->project_name); ?></h3>
-                                <p class="mt-1 truncate text-xs text-[#525252]">/sites/<?php echo html_escape($project->username ?? $auth_user->username); ?>/<?php echo html_escape($project->slug); ?></p>
                             </div>
                             <span class="shrink-0 px-2.5 py-1 text-[11px] font-semibold <?php echo html_escape($badgeClass); ?>"><?php echo html_escape($statusLabel); ?></span>
                         </div>
@@ -130,7 +134,7 @@ $deleteUrl = site_url('projects/delete_project');
             </label>
             <div class="flex items-center justify-end gap-3">
                 <button type="button" data-close-modal class="border border-[#e0e0e0] px-4 py-2 text-sm font-semibold text-[#525252] hover:bg-[#f4f4f4]">Cancel</button>
-                <button type="submit" class="inline-flex items-center gap-2 border border-[#0f62fe] bg-[#0f62fe] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0353e9]"><i data-lucide="sparkles"></i> Create</button>
+                <button type="submit" class="inline-flex items-center gap-2 border border-[#0f62fe] bg-[#0f62fe] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0353e9]"><i data-lucide="plus"></i> Create</button>
             </div>
         </form>
     </div>

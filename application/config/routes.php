@@ -50,7 +50,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 |		my-controller/my-method	-> my_controller/my_method
 */
 $route['default_controller'] = 'auth';
-$route['404_override'] = '';
+$route['404_override'] = 'errors/page_missing';
 $route['translate_uri_dashes'] = FALSE;
 
 $route['login'] = 'auth/login';
@@ -71,7 +71,9 @@ $route['projects/delete_file'] = 'projects/delete_file';
 $route['projects/upload_file'] = 'projects/upload_file';
 $route['projects/preview/(:num)'] = 'projects/preview/$1';
 $route['projects/preview/(:num)/(.*)'] = 'projects/preview/$1/$2';
+$route['projects/preview/(:num)/(:any)'] = 'projects/preview/$1/$2';
 $route['projects/publish/(:num)'] = 'projects/publish/$1';
+$route['projects/savedraft'] = 'projects/savedraft';
 $route['projects/(:any)'] = 'projects/show/$1';
 
 $route['editor/(:num)'] = 'projects/editor/$1';

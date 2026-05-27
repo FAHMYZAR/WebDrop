@@ -59,19 +59,49 @@ class ProjectManager
     {
         $workspacePath = rtrim($project->workspace_path, DIRECTORY_SEPARATOR);
         $publishedPath = rtrim((string) $project->published_path, DIRECTORY_SEPARATOR);
+        $previousDbDebug = $this->CI->db->db_debug;
+        $this->CI->db->db_debug = false;
 
-        $this->CI->Activity_log_model->create($user->id_user, 'delete_project', 'Project dihapus: ' . $project->project_name, $project->id_project);
+        try {
+            try {
+                $this->CI->Activity_log_model->create($user->id_user, 'delete_project', 'Project dihapus: ' . $project->project_name, $project->id_project);
+            } catch (Throwable $exception) {
+                // Delete must continue even if audit log fails.
+            }
 
-        if ($workspacePath !== '' && is_dir($workspacePath)) {
-            $this->deleteDirectory($workspacePath);
+            if ($workspacePath !== '' && is_dir($workspacePath)) {
+                $this->deleteDirectory($workspacePath);
+            }
+
+            if ($publishedPath !== '' && is_dir($publishedPath)) {
+                $this->deleteDirectory($publishedPath);
+            }
+
+            try {
+                $this->CI->Project_file_model->deleteByProject($project->id_project);
+            } catch (Throwable $exception) {
+                // Ignore broken table/trigger state and continue project removal.
+            }
+
+            $this->CI->Project_model->deleteByUserAndId($user->id_user, $project->id_project);
+        } finally {
+            $this->CI->db->db_debug = $previousDbDebug;
         }
+    }
+
+    public function unpublishProject($project)
+    {
+        $publishedPath = rtrim((string) $project->published_path, DIRECTORY_SEPARATOR);
 
         if ($publishedPath !== '' && is_dir($publishedPath)) {
             $this->deleteDirectory($publishedPath);
         }
 
-        $this->CI->Project_file_model->deleteByProject($project->id_project);
-        $this->CI->Project_model->deleteByUserAndId($user->id_user, $project->id_project);
+        return $this->CI->Project_model->update($project->id_project, array(
+            'status' => 'draft',
+            'public_url' => null,
+            'published_path' => null,
+        ));
     }
 
     protected function defaultHtml($projectName)

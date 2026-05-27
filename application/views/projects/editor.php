@@ -22,8 +22,15 @@ $projectId = (int) $project->id_project;
                 </div>
             </div>
             <div class="flex items-center gap-2">
+                <button type="button" data-save-file class="inline-flex items-center gap-2 border border-[#e0e0e0] bg-white px-4 py-2 text-sm font-semibold text-[#525252] hover:bg-[#f4f4f4]"><i data-lucide="save" class="h-4 w-4"></i><span class="hidden sm:inline">Save</span></button>
                 <button type="button" data-preview-toggle class="inline-flex items-center gap-2 border border-[#e0e0e0] bg-white px-4 py-2 text-sm font-semibold text-[#525252] hover:bg-[#f4f4f4]"><i data-lucide="eye" class="h-4 w-4"></i><span class="hidden sm:inline">Preview</span></button>
-                <button type="button" data-publish-project class="inline-flex items-center gap-2 border border-[#0f62fe] bg-[#0f62fe] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0353e9]"><i data-lucide="globe" class="h-4 w-4"></i><span class="hidden sm:inline">Publish</span></button>
+                <div class="relative" data-publish-dropdown>
+                    <button type="button" data-publish-toggle class="inline-flex items-center gap-2 border border-[#0f62fe] bg-[#0f62fe] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0353e9]"><i data-lucide="globe" class="h-4 w-4"></i><span class="hidden sm:inline">Publish</span><i data-lucide="chevron-down" class="h-4 w-4"></i></button>
+                    <div class="absolute right-0 top-full z-50 mt-2 hidden w-48 border border-[#e0e0e0] bg-white shadow-sm" data-publish-menu>
+                        <button type="button" data-publish-now class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#525252] hover:bg-[#f4f4f4] hover:text-[#161616]"><i data-lucide="globe" class="h-4 w-4"></i><span>Publish Now</span></button>
+                        <button type="button" data-save-draft class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#525252] hover:bg-[#f4f4f4] hover:text-[#161616]"><i data-lucide="file-text" class="h-4 w-4"></i><span>Save as Draft</span></button>
+                    </div>
+                </div>
             </div>
         </div>
     </header>
@@ -75,7 +82,6 @@ $projectId = (int) $project->id_project;
                     <div class="wd-editor-pane flex min-h-0 flex-1 flex-col" data-pane="editor">
                         <div class="relative flex min-h-0 flex-1 overflow-hidden bg-white">
                             <div id="wd-monaco" class="wd-monaco-wrap h-full w-full flex-1 min-h-0"></div>
-                            <button type="button" data-save-file class="absolute bottom-4 right-4 z-40 inline-flex items-center gap-2 border border-[#0f62fe] bg-[#0f62fe] px-4 py-3 text-sm font-semibold text-white hover:bg-[#0353e9]" style="box-shadow: 0 2px 6px rgba(15, 98, 254, 0.16);"><i data-lucide="save" class="h-4 w-4"></i><span>Save</span></button>
                             <div class="absolute inset-0 hidden items-center justify-center bg-white px-6 text-center" data-noneditable-panel>
                                 <div class="max-w-md border border-[#e0e0e0] bg-[#f4f4f4] p-6">
                                     <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center border border-[#e0e0e0] bg-white text-[#0f62fe]"><i data-lucide="file-text" class="h-5 w-5"></i></div>
@@ -98,7 +104,7 @@ $projectId = (int) $project->id_project;
                             </div>
                         </div>
                         <div class="preview-body flex min-h-0 flex-1 overflow-hidden bg-white" data-preview-body>
-                            <iframe data-preview-frame data-src="<?php echo html_escape($preview_url); ?>" sandbox="allow-scripts allow-forms" class="block h-full w-full border-0" src="<?php echo html_escape($preview_url); ?>" title="Preview <?php echo html_escape($projectName); ?>"></iframe>
+                            <iframe id="previewFrame" data-preview-frame data-src="<?php echo html_escape($preview_url); ?>" sandbox="allow-scripts allow-forms allow-same-origin" class="block h-full w-full border-0" src="<?php echo html_escape($preview_url); ?>?t=<?php echo time(); ?>" title="Preview <?php echo html_escape($projectName); ?>"></iframe>
                         </div>
                     </section>
                 </div>
@@ -170,7 +176,8 @@ $projectId = (int) $project->id_project;
                 renameFile: <?php echo json_encode(site_url('projects/rename_file')); ?>,
                 deleteFile: <?php echo json_encode(site_url('projects/delete_file')); ?>,
                 uploadFile: <?php echo json_encode(site_url('projects/upload_file')); ?>,
-                publish: <?php echo json_encode(site_url('projects/publish/' . $projectId)); ?>
+                publish: <?php echo json_encode(site_url('projects/publish/' . $projectId)); ?>,
+                saveDraft: <?php echo json_encode(site_url('projects/savedraft')); ?>
             },
             csrfName: <?php echo json_encode($this->security->get_csrf_token_name()); ?>,
             csrfHash: <?php echo json_encode($this->security->get_csrf_hash()); ?>,
