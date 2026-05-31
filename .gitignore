@@ -10,14 +10,27 @@ application/cache/*
 application/logs/*
 !application/logs/index.html
 
-# App storage generated files
 # =========================
-storage/logs/*
-storage/profile_photos/*
-storage/published/*
-storage/temp_uploads/*
-storage/workspaces/*
-storage/tmp/imports/*
+# Keep storage folders, ignore their contents
+# =========================
+
+storage/logs/**
+!storage/logs/.gitkeep
+
+storage/profile_photos/**
+!storage/profile_photos/.gitkeep
+
+storage/published/**
+!storage/published/.gitkeep
+
+storage/temp_uploads/**
+!storage/temp_uploads/.gitkeep
+
+storage/workspaces/**
+!storage/workspaces/.gitkeep
+
+storage/tmp/imports/**
+!storage/tmp/imports/.gitkeep
 
 # Keep placeholder / protection files if needed
 !storage/**/.gitkeep
