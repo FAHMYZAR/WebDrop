@@ -10,11 +10,27 @@ application/cache/*
 application/logs/*
 !application/logs/index.html
 
-storage/*
-!storage/.htaccess
+# App storage generated files
+# =========================
+storage/logs/*
+storage/profile_photos/*
+storage/published/*
+storage/temp_uploads/*
+storage/workspaces/*
+storage/tmp/imports/*
 
+# Keep placeholder / protection files if needed
+!storage/**/.gitkeep
+!storage/**/.htaccess
+!storage/**/index.html
+
+
+# =========================
+# Published user sites
+# =========================
 sites/*
 !sites/.htaccess
+!sites/404.html
 
 !application/*/.htaccess
 
