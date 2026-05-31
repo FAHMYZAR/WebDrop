@@ -56,6 +56,14 @@ class FileManagerService
             throw new RuntimeException('File tidak ditemukan.');
         }
 
+        $oldSize = (int) filesize($path);
+        $newSize = strlen($content);
+        $sizeDiff = $newSize - $oldSize;
+
+        if ($sizeDiff > 0) {
+            $this->CI->filevalidator->assertQuota($project, $sizeDiff);
+        }
+
         file_put_contents($path, $content);
         $this->syncProjectFiles($project);
     }
@@ -112,6 +120,13 @@ class FileManagerService
         $targetRelativePath = $this->joinPath($parent, $newName);
 
         if ( ! is_dir($sourcePath)) {
+            $sourceExtension = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
+            $targetExtension = strtolower(pathinfo($targetRelativePath, PATHINFO_EXTENSION));
+
+            if ($sourceExtension !== $targetExtension) {
+                throw new RuntimeException('Rename file tidak boleh mengubah ekstensi.');
+            }
+
             $this->CI->filevalidator->assertManagedExtension($targetRelativePath);
         }
 
@@ -150,7 +165,11 @@ class FileManagerService
         }
 
         $fileName = $this->CI->filevalidator->assertFileName($file['name']);
-        $this->CI->filevalidator->assertAllowedUpload($fileName, (int) $file['size']);
+        $fileSize = (int) $file['size'];
+
+        $this->CI->filevalidator->assertAllowedUpload($fileName, $fileSize);
+        $this->CI->filevalidator->assertQuota($project, $fileSize);
+
         $relativePath = $this->joinPath($parentPath, $fileName);
         $targetPath = $this->projectAbsolutePath($project, $relativePath);
 
@@ -167,6 +186,91 @@ class FileManagerService
         $this->syncProjectFiles($project);
 
         return $relativePath;
+    }
+
+    public function uploadZipImport($project, $file)
+    {
+        if (empty($file['name']) || (int) $file['error'] !== UPLOAD_ERR_OK) {
+            throw new RuntimeException('Upload ZIP gagal.');
+        }
+
+        $fileName = $this->CI->filevalidator->assertFileName($file['name']);
+        $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+
+        if ($extension !== 'zip') {
+            throw new RuntimeException('File import harus berformat ZIP.');
+        }
+
+        $this->CI->filevalidator->assertAllowedUpload($fileName, (int) $file['size']);
+        $importDirectory = $this->zipImportDirectory($project);
+        $token = date('YmdHis') . '-' . bin2hex(random_bytes(8));
+        $storedName = $token . '.zip';
+        $targetPath = $importDirectory . $storedName;
+
+        if ( ! is_dir($importDirectory) && ! mkdir($importDirectory, DIR_WRITE_MODE, true) && ! is_dir($importDirectory)) {
+            throw new RuntimeException('Gagal membuat folder import sementara.');
+        }
+
+        if ( ! move_uploaded_file($file['tmp_name'], $targetPath)) {
+            throw new RuntimeException('Gagal menyimpan ZIP import.');
+        }
+
+        return array(
+            'token' => $token,
+            'file_name' => $fileName,
+            'stored_name' => $storedName,
+            'size' => (int) filesize($targetPath),
+        );
+    }
+
+    public function cancelZipImport($project, $token)
+    {
+        $zipPath = $this->zipImportPath($project, $token);
+
+        if (is_file($zipPath)) {
+            unlink($zipPath);
+        }
+    }
+
+    public function extractZipImport($project, $token)
+    {
+        $zipPath = $this->zipImportPath($project, $token);
+
+        if ( ! is_file($zipPath)) {
+            throw new RuntimeException('ZIP import tidak ditemukan.');
+        }
+
+        if ( ! class_exists('ZipArchive')) {
+            throw new RuntimeException('Ekstensi PHP ZipArchive belum aktif.');
+        }
+
+        $zip = new ZipArchive();
+
+        if ($zip->open($zipPath) !== true) {
+            throw new RuntimeException('ZIP import tidak bisa dibuka.');
+        }
+
+        $scan = $this->scanZipImport($project, $zip);
+
+        if ($scan['success_count'] < 1) {
+            $zip->close();
+            throw new RuntimeException('Extract dibatalkan karena tidak ada file valid.');
+        }
+
+        $this->CI->filevalidator->assertQuota($project, $scan['total_size']);
+        $this->extractScannedZipEntries($project, $zip, $scan['valid_files']);
+        $zip->close();
+        unlink($zipPath);
+        $this->syncProjectFiles($project);
+
+        return array(
+            'success_count' => $scan['success_count'],
+            'rejected_count' => count($scan['rejected']),
+            'conflict_count' => count($scan['conflicts']),
+            'total_size' => $scan['total_size'],
+            'rejected' => array_slice($scan['rejected'], 0, 20),
+            'conflicts' => array_slice($scan['conflicts'], 0, 20),
+        );
     }
 
     public function syncProjectFiles($project)
@@ -265,6 +369,151 @@ class FileManagerService
         $this->CI->filevalidator->assertFileName($childName);
 
         return $parentPath === '' ? $childName : $parentPath . '/' . $childName;
+    }
+
+    protected function zipImportDirectory($project)
+    {
+        return FCPATH . 'storage' . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR . 'imports' . DIRECTORY_SEPARATOR . (int) $project->id_user . DIRECTORY_SEPARATOR . (int) $project->id_project . DIRECTORY_SEPARATOR;
+    }
+
+    protected function zipImportPath($project, $token)
+    {
+        $token = preg_replace('/[^a-zA-Z0-9_\-]/', '', $token);
+
+        return $this->zipImportDirectory($project) . $token . '.zip';
+    }
+
+    protected function scanZipImport($project, ZipArchive $zip)
+    {
+        $maxFiles = 300;
+        $maxDepth = 8;
+        $validFiles = array();
+        $rejected = array();
+        $conflicts = array();
+        $totalSize = 0;
+        $totalEntries = $zip->numFiles;
+
+        if ($totalEntries > $maxFiles) {
+            throw new RuntimeException('ZIP mengandung lebih dari ' . $maxFiles . ' file.');
+        }
+
+        $workspaceBase = rtrim($project->workspace_path, DIRECTORY_SEPARATOR);
+
+        for ($i = 0; $i < $totalEntries; $i++) {
+            $stat = $zip->statIndex($i);
+
+            if ($stat === false) {
+                continue;
+            }
+
+            $entryName = str_replace('\\', '/', $stat['name']);
+            $entryName = ltrim($entryName, '/');
+
+            if ($entryName === '' || substr($entryName, -1) === '/') {
+                continue;
+            }
+
+            if (strpos($entryName, '../') !== false || strpos($entryName, '..\\') !== false) {
+                $rejected[] = array('file' => $entryName, 'reason' => 'Path traversal');
+                continue;
+            }
+
+            if (preg_match('/^[A-Za-z]:[\\/]/', $entryName)) {
+                $rejected[] = array('file' => $entryName, 'reason' => 'Absolute path');
+                continue;
+            }
+
+            $depth = substr_count($entryName, '/');
+
+            if ($depth > $maxDepth) {
+                $rejected[] = array('file' => $entryName, 'reason' => 'Kedalaman folder melebihi batas');
+                continue;
+            }
+
+            $segments = explode('/', $entryName);
+            $segmentInvalid = false;
+
+            foreach ($segments as $segment) {
+                if ($segment === '' || $segment === '.' || $segment === '..' || preg_match('/[<>:"|?*]/', $segment)) {
+                    $segmentInvalid = true;
+                    break;
+                }
+            }
+
+            if ($segmentInvalid) {
+                $rejected[] = array('file' => $entryName, 'reason' => 'Nama file/folder tidak valid');
+                continue;
+            }
+
+            $baseName = basename($entryName);
+            $ext = strtolower(pathinfo($baseName, PATHINFO_EXTENSION));
+
+            if ($ext === 'zip') {
+                $rejected[] = array('file' => $entryName, 'reason' => 'Nested ZIP tidak diizinkan');
+                continue;
+            }
+
+            if ($this->CI->filevalidator->isBlockedExtension($ext)) {
+                $rejected[] = array('file' => $entryName, 'reason' => 'Ekstensi diblokir');
+                continue;
+            }
+
+            if ($baseName === '.htaccess' || $baseName === '.env') {
+                $rejected[] = array('file' => $entryName, 'reason' => 'File konfigurasi diblokir');
+                continue;
+            }
+
+            if ( ! $this->CI->filevalidator->isEditableExtension($ext) && ! $this->CI->filevalidator->isAssetExtension($ext)) {
+                $allowed = $this->CI->Allowed_file_type_model->findActiveByExtension($ext);
+
+                if ( ! $allowed) {
+                    $rejected[] = array('file' => $entryName, 'reason' => 'Ekstensi tidak didukung');
+                    continue;
+                }
+
+                $maxBytes = ((int) $allowed->max_size_mb) * 1024 * 1024;
+
+                if ((int) $stat['size'] > $maxBytes) {
+                    $rejected[] = array('file' => $entryName, 'reason' => 'Ukuran melebihi batas');
+                    continue;
+                }
+            }
+
+            $targetAbsPath = $workspaceBase . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $entryName);
+
+            if (file_exists($targetAbsPath)) {
+                $conflicts[] = array('file' => $entryName, 'reason' => 'File sudah ada di workspace');
+                continue;
+            }
+
+            $totalSize += (int) $stat['size'];
+            $validFiles[] = array('index' => $i, 'path' => $entryName, 'size' => (int) $stat['size']);
+        }
+
+        return array(
+            'valid_files' => $validFiles,
+            'rejected' => $rejected,
+            'conflicts' => $conflicts,
+            'success_count' => count($validFiles),
+            'total_size' => $totalSize,
+        );
+    }
+
+    protected function extractScannedZipEntries($project, ZipArchive $zip, array $validFiles)
+    {
+        $workspaceBase = rtrim($project->workspace_path, DIRECTORY_SEPARATOR);
+
+        foreach ($validFiles as $entry) {
+            $targetPath = $workspaceBase . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $entry['path']);
+            $this->ensureParentDirectory($targetPath);
+            $content = $zip->getFromIndex($entry['index']);
+
+            if ($content === false) {
+                continue;
+            }
+
+            file_put_contents($targetPath, $content);
+        }
     }
 
     protected function deleteRecursive($path)

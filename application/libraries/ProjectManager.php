@@ -76,6 +76,67 @@ class ProjectManager
         }
     }
 
+    public function renameProject($project, $user, $newName)
+    {
+        $newName = $this->CI->filevalidator->assertProjectName($newName);
+
+        if ($newName === $project->project_name) {
+            return $project;
+        }
+
+        $baseSlug = strtolower(trim((string) $newName));
+        $baseSlug = preg_replace('/[^a-z0-9]+/', '-', $baseSlug);
+        $baseSlug = trim($baseSlug, '-');
+        $baseSlug = $baseSlug !== '' ? $baseSlug : 'project';
+        $oldSlug = $project->slug;
+
+        if ($baseSlug === $oldSlug) {
+            $this->CI->Project_model->update($project->id_project, array('project_name' => $newName));
+            return $this->CI->Project_model->findById($project->id_project);
+        }
+
+        $newSlug = $this->CI->sluggenerator->uniqueForUser($user->id_user, $newName);
+        $newWorkspacePath = $this->CI->pathresolver->workspaceDirectory($user->username, $newSlug);
+        $oldWorkspacePath = $project->workspace_path;
+
+        if (is_dir($oldWorkspacePath)) {
+            if (file_exists($newWorkspacePath)) {
+                throw new RuntimeException('Folder tujuan sudah dipakai.');
+            }
+            if ( ! rename($oldWorkspacePath, $newWorkspacePath)) {
+                throw new RuntimeException('Gagal mengubah nama folder workspace.');
+            }
+        }
+
+        $updateData = array(
+            'project_name' => $newName,
+            'slug' => $newSlug,
+            'workspace_path' => $newWorkspacePath,
+        );
+
+        if ($project->status === 'published' && !empty($project->published_path)) {
+            $oldPublishedPath = $project->published_path;
+            $newPublishedPath = $this->CI->pathresolver->siteDirectory($user->username, $newSlug);
+            $newPublicUrl = $this->CI->pathresolver->publicUrl($user->username, $newSlug);
+
+            if (is_dir($oldPublishedPath)) {
+                if ( ! file_exists($newPublishedPath) && rename($oldPublishedPath, $newPublishedPath)) {
+                    $updateData['published_path'] = $newPublishedPath;
+                    $updateData['public_url'] = $newPublicUrl;
+                } else {
+                    $this->unpublishProject($project);
+                    $updateData['status'] = 'draft';
+                    $updateData['published_path'] = null;
+                    $updateData['public_url'] = null;
+                }
+            }
+        }
+
+        $this->CI->Project_model->update($project->id_project, $updateData);
+
+        return $this->CI->Project_model->findById($project->id_project);
+    }
+
     public function unpublishProject($project)
     {
         $publishedPath = rtrim((string) $project->published_path, DIRECTORY_SEPARATOR);

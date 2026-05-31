@@ -6,7 +6,7 @@ class Projects extends App_Controller
     public function __construct()
     {
         parent::__construct();
-        $this->load->model(array('Project_model', 'Activity_log_model'));
+        $this->load->model(array('Project_model', 'Activity_log_model', 'File_model'));
         $this->load->library(array('ProjectManager', 'FileManagerService'));
     }
 
@@ -46,6 +46,32 @@ class Projects extends App_Controller
         }
     }
 
+    public function rename_project()
+    {
+        if ($this->input->method() !== 'post') {
+            $this->jsonResponse(false, 'Method not allowed.', array(), 405);
+            return;
+        }
+
+        try {
+            $project = $this->requireProjectForUser((int) $this->input->post('id_project'));
+            $projectName = trim((string) $this->input->post('project_name', true));
+            $updatedProject = $this->projectmanager->renameProject($project, $this->user(), $projectName);
+
+            try {
+                $this->Activity_log_model->create($this->user()->id_user, 'rename_project', 'Project diubah: ' . $project->project_name . ' -> ' . $updatedProject->project_name, $project->id_project);
+            } catch (Throwable $exception) {
+                log_message('error', 'Rename project log failed: ' . $exception->getMessage());
+            }
+
+            $this->jsonResponse(true, 'Project berhasil di-rename.', array(
+                'project' => $this->projectPayload($updatedProject),
+            ));
+        } catch (Throwable $exception) {
+            $this->jsonResponse(false, $exception->getMessage(), array(), 422);
+        }
+    }
+
     public function editor($projectId)
     {
         $project = $this->requireProjectForUser((int) $projectId);
@@ -74,6 +100,7 @@ class Projects extends App_Controller
             'selected_entry' => $selectedEntry,
             'selected_content' => $selectedContent,
             'selected_error' => $selectedError,
+            'project_usage_bytes' => $this->File_model->totalSizeByProject($project->id_project),
             'preview_url' => site_url('project-preview/' . $project->id_project),
             'layout_variant' => 'editor',
             'body_class' => 'app-body h-screen overflow-hidden',

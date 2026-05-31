@@ -6,6 +6,10 @@ $selectedContent = isset($selected_content) ? $selected_content : '';
 $selectedError = isset($selected_error) ? $selected_error : null;
 $projectName = isset($project->project_name) ? $project->project_name : 'Project';
 $projectId = (int) $project->id_project;
+$projectUsageMb = (isset($project_usage_bytes) ? $project_usage_bytes : 0) / (1024 * 1024);
+$projectLimitMb = 50;
+$projectUsagePercent = min(100, max(0, ($projectUsageMb / $projectLimitMb) * 100));
+$projectUsageNearLimit = $projectUsagePercent > 90;
 ?>
 <div id="wd-editor" class="wd-editor-shell h-full flex flex-col overflow-hidden bg-slate-50" data-project-id="<?php echo $projectId; ?>" data-preview-url="<?php echo html_escape($preview_url); ?>" data-project-name="<?php echo html_escape($projectName); ?>">
     <header class="sticky top-0 z-40 border-b border-gray-200 bg-white/95 backdrop-blur">
@@ -38,26 +42,40 @@ $projectId = (int) $project->id_project;
     <div class="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <aside class="wd-scrollbar hidden shrink-0 border-r border-[#e0e0e0] bg-white lg:flex lg:flex-col" data-sidebar data-collapsed="false" style="--sidebar-width:280px; flex:0 0 var(--sidebar-width); width:var(--sidebar-width);">
             <div class="border-b border-[#e0e0e0] px-4 py-4" data-sidebar-head>
-                <div class="flex items-center justify-between gap-2">
+                <div class="flex flex-col gap-3">
                     <div class="min-w-0" data-sidebar-label>
-                        <p class="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">FILES</p>
+                        <div class="flex items-center gap-3">
+                            <p class="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">FILES</p>
+                            <div class="flex items-center gap-2" title="Project Storage: <?php echo number_format($projectUsageMb, 2); ?> MB / <?php echo $projectLimitMb; ?> MB">
+                                <div class="h-1.5 w-16 overflow-hidden bg-[#e0e0e0]">
+                                    <div class="h-full <?php echo $projectUsageNearLimit ? 'bg-[#da1e28]' : 'bg-[#0f62fe]'; ?>" style="width: <?php echo $projectUsagePercent; ?>%;"></div>
+                                </div>
+                                <span class="whitespace-nowrap text-[10px] font-semibold text-[#8d8d8d]"><?php echo number_format($projectUsageMb, 1); ?>/<?php echo $projectLimitMb; ?>M</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="flex items-center gap-1 text-[#525252]" data-sidebar-actions>
+                    <div class="flex items-center justify-end gap-1 text-[#525252]" data-sidebar-actions>
                         <div class="relative inline-flex" data-sidebar-create>
                             <button type="button" data-sidebar-create-toggle class="inline-flex h-8 w-8 items-center justify-center rounded-sm hover:bg-[#f4f4f4] hover:text-[#161616]" title="Create" aria-haspopup="menu" aria-expanded="false"><i data-lucide="plus" class="h-4 w-4"></i></button>
-                            <div class="absolute right-0 top-full z-50 mt-2 hidden w-48 border border-[#e0e0e0] bg-white shadow-sm" data-sidebar-create-menu role="menu">
+                            <div class="hidden border border-[#e0e0e0] bg-white shadow-sm" data-sidebar-create-menu role="menu">
                                 <button type="button" data-create-file class="flex h-9 w-full items-center gap-2 px-3 text-left text-sm text-[#525252] hover:bg-[#f4f4f4] hover:text-[#161616]" role="menuitem"><i data-lucide="file-plus" class="h-4 w-4"></i><span>New file</span></button>
                                 <button type="button" data-create-folder class="flex h-9 w-full items-center gap-2 px-3 text-left text-sm text-[#525252] hover:bg-[#f4f4f4] hover:text-[#161616]" role="menuitem"><i data-lucide="folder-plus" class="h-4 w-4"></i><span>New folder</span></button>
                                 <button type="button" data-upload-file class="flex h-9 w-full items-center gap-2 px-3 text-left text-sm text-[#525252] hover:bg-[#f4f4f4] hover:text-[#161616]" role="menuitem"><i data-lucide="upload" class="h-4 w-4"></i><span>Upload file</span></button>
                             </div>
                         </div>
                         <button type="button" data-refresh-tree class="inline-flex h-8 w-8 items-center justify-center rounded-sm hover:bg-[#f4f4f4] hover:text-[#161616]" title="Refresh"><i data-lucide="refresh-cw" class="h-4 w-4"></i></button>
-                        <button type="button" data-sidebar-collapse class="inline-flex h-8 w-8 items-center justify-center rounded-sm hover:bg-[#f4f4f4] hover:text-[#161616]" data-sidebar-toggle="collapse" title="Collapse sidebar"><i data-lucide="panel-left-close" class="h-4 w-4"></i></button>
+                        <button type="button" data-sidebar-collapse class="inline-flex h-8 w-8 items-center justify-center rounded-sm hover:bg-[#f4f4f4] hover:text-[#161616]" data-sidebar-toggle="collapse" title="Collapse sidebar"><i data-lucide="panel-left-close" class="h-2 w-2"></i></button>
                     </div>
                 </div>
             </div>
+            <div class="border-b border-[#e0e0e0] px-3 py-3" data-pending-import-wrap>
+                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-[#8d8d8d]">Pending Import</p>
+                <div class="mt-2 space-y-2" data-pending-import-list>
+                    <p class="text-xs text-[#8d8d8d]">Belum ada ZIP import.</p>
+                </div>
+            </div>
             <div class="hidden px-2 py-2" data-sidebar-rail>
-                <button type="button" data-sidebar-expand class="inline-flex h-8 w-8 items-center justify-center rounded-sm hover:bg-[#f4f4f4] hover:text-[#161616]" data-sidebar-toggle="expand" title="Expand sidebar"><i data-lucide="panel-left-open" class="h-4 w-4"></i></button>
+                <button type="button" data-sidebar-expand class="inline-flex h-8 w-8 items-center justify-center rounded-sm hover:bg-[#f4f4f4] hover:text-[#161616]" data-sidebar-toggle="expand" title="Expand sidebar"><i data-lucide="panel-left-open" class="h-5 w-5"></i></button>
             </div>
             <div class="wd-scrollbar flex-1 overflow-y-auto px-3 py-4" data-tree-root></div>
             <div class="hidden lg:block" data-sidebar-resize-handle aria-hidden="true"></div>
@@ -176,6 +194,9 @@ $projectId = (int) $project->id_project;
                 renameFile: <?php echo json_encode(site_url('project-files/rename-file')); ?>,
                 deleteFile: <?php echo json_encode(site_url('project-files/delete-file')); ?>,
                 uploadFile: <?php echo json_encode(site_url('project-files/upload-file')); ?>,
+                uploadZip: <?php echo json_encode(site_url('project-files/upload-zip')); ?>,
+                extractZip: <?php echo json_encode(site_url('project-files/extract-zip')); ?>,
+                cancelZip: <?php echo json_encode(site_url('project-files/cancel-zip-import')); ?>,
                 publish: <?php echo json_encode(site_url('project-publish/' . $projectId)); ?>,
                 saveDraft: <?php echo json_encode(site_url('project-publish/savedraft')); ?>
             },

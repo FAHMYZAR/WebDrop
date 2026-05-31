@@ -158,4 +158,63 @@ class ProjectFiles extends App_Controller
             $this->jsonResponse(false, $exception->getMessage(), array(), 422);
         }
     }
+
+    public function upload_zip()
+    {
+        if ($this->input->method() !== 'post') {
+            $this->jsonResponse(false, 'Method not allowed.', array(), 405);
+            return;
+        }
+
+        try {
+            $project = $this->requireProjectForUser((int) $this->input->post('id_project'));
+            $uploaded = isset($_FILES['asset']) ? $_FILES['asset'] : array();
+            $importInfo = $this->filemanagerservice->uploadZipImport($project, $uploaded);
+
+            $this->jsonResponse(true, 'ZIP berhasil diupload ke import queue.', array(
+                'import' => $importInfo,
+            ));
+        } catch (Throwable $exception) {
+            $this->jsonResponse(false, $exception->getMessage(), array(), 422);
+        }
+    }
+
+    public function extract_zip()
+    {
+        if ($this->input->method() !== 'post') {
+            $this->jsonResponse(false, 'Method not allowed.', array(), 405);
+            return;
+        }
+
+        try {
+            $project = $this->requireProjectForUser((int) $this->input->post('id_project'));
+            $token = $this->input->post('token', true);
+            $report = $this->filemanagerservice->extractZipImport($project, $token);
+
+            $message = sprintf('Extract selesai: %d file berhasil, %d ditolak, %d konflik.', $report['success_count'], $report['rejected_count'], $report['conflict_count']);
+
+            $this->jsonResponse(true, $message, array(
+                'report' => $report,
+            ));
+        } catch (Throwable $exception) {
+            $this->jsonResponse(false, $exception->getMessage(), array(), 422);
+        }
+    }
+
+    public function cancel_zip_import()
+    {
+        if ($this->input->method() !== 'post') {
+            $this->jsonResponse(false, 'Method not allowed.', array(), 405);
+            return;
+        }
+
+        try {
+            $project = $this->requireProjectForUser((int) $this->input->post('id_project'));
+            $token = $this->input->post('token', true);
+            $this->filemanagerservice->cancelZipImport($project, $token);
+            $this->jsonResponse(true, 'Import dibatalkan.');
+        } catch (Throwable $exception) {
+            $this->jsonResponse(false, $exception->getMessage(), array(), 422);
+        }
+    }
 }

@@ -15,6 +15,7 @@
     const sidebarCreateToggle = root.querySelector('[data-sidebar-create-toggle]');
     const sidebarCreateMenu = root.querySelector('[data-sidebar-create-menu]');
     const sidebarResizeHandle = root.querySelector('[data-sidebar-resize-handle]');
+    const pendingImportList = root.querySelector('[data-pending-import-list]');
     const previewPanel = root.querySelector('[data-preview-panel]');
     const previewBody = root.querySelector('[data-preview-body]');
     const previewFrame = root.querySelector('[data-preview-frame]');
@@ -58,6 +59,7 @@
         sidebarResizeStartWidth: 280,
         inlineRenamePath: null,
         inlineRenameValue: '',
+        pendingImports: [],
     };
     let layoutFrameId = null;
     const previewStorageKey = 'webdrop-editor-preview-height';
@@ -68,6 +70,24 @@
         if (window.lucide) {
             window.lucide.createIcons();
         }
+    };
+
+    const positionCreateMenu = () => {
+        if (!sidebarCreateMenu || !sidebarCreateToggle || sidebarCreateMenu.classList.contains('hidden')) {
+            return;
+        }
+
+        const rect = sidebarCreateToggle.getBoundingClientRect();
+        const dropdownWidth = 180;
+        let left = rect.left + rect.width / 2 - dropdownWidth / 2;
+
+        left = Math.max(8, Math.min(left, window.innerWidth - dropdownWidth - 8));
+
+        sidebarCreateMenu.style.position = 'fixed';
+        sidebarCreateMenu.style.top = `${rect.bottom + 8}px`;
+        sidebarCreateMenu.style.left = `${left}px`;
+        sidebarCreateMenu.style.width = `${dropdownWidth}px`;
+        sidebarCreateMenu.style.zIndex = '9999';
     };
 
     const closeCreateMenu = () => {
@@ -86,6 +106,7 @@
 
         sidebarCreateMenu.classList.remove('hidden');
         sidebarCreateToggle.setAttribute('aria-expanded', 'true');
+        positionCreateMenu();
     };
 
     const toggleCreateMenu = () => {
@@ -242,6 +263,39 @@
         document.body.removeChild(textarea);
     };
 
+    const formatBytes = (bytes) => {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    };
+
+    const renderPendingImports = () => {
+        if (!pendingImportList) return;
+        if (state.pendingImports.length === 0) {
+            pendingImportList.innerHTML = '<p class="text-xs text-[#8d8d8d]">Belum ada ZIP import.</p>';
+            return;
+        }
+
+        pendingImportList.innerHTML = state.pendingImports.map((imp) => `
+            <div class="rounded-sm border border-[#0f62fe] bg-[#f4f4f4] p-2 text-sm text-[#161616]">
+                <div class="flex items-start gap-2">
+                    <i data-lucide="package" class="h-4 w-4 shrink-0 text-[#0f62fe] mt-0.5"></i>
+                    <div class="min-w-0 flex-1">
+                        <p class="truncate font-semibold text-xs leading-tight" title="${escapeHtml(imp.file_name)}">${escapeHtml(imp.file_name)}</p>
+                        <p class="text-[10px] text-[#525252]">${formatBytes(imp.size)}</p>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-center gap-2">
+                    <button type="button" class="flex-1 bg-[#0f62fe] px-2 py-1 text-[10px] font-bold text-white hover:bg-[#0353e9]" data-extract-zip="${escapeHtml(imp.token)}">EXTRACT</button>
+                    <button type="button" class="flex-1 border border-[#e0e0e0] bg-white px-2 py-1 text-[10px] font-bold text-[#525252] hover:bg-[#fff1f1] hover:text-[#da1e28]" data-cancel-zip="${escapeHtml(imp.token)}">CANCEL</button>
+                </div>
+            </div>
+        `).join('');
+        iconsReady();
+    };
+
     const openModal = () => {
         actionModal?.classList.remove('hidden');
         actionModal?.classList.add('flex');
@@ -324,6 +378,8 @@
         const parts = path.split('.');
         return parts.length > 1 ? parts.pop().toLowerCase() : '';
     };
+
+    const escapeHtml = (value) => String(value || '').replace(/[&<>"]+/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
 
     const editableFor = (entry) => Boolean(entry && Number(entry.is_folder) === 0 && Number(entry.is_editable) === 1);
 
@@ -578,8 +634,6 @@
         iconsReady();
     };
 
-    const escapeHtml = (value) => String(value || '').replace(/[&<>"]+/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
-
     const renderNonEditable = (entry, content) => {
         nonEditablePanel?.classList.remove('hidden');
         nonEditablePanel?.classList.add('flex');
@@ -762,13 +816,29 @@
                 payload = await requestJSON(endpoints.renameFile, formData);
             } else if (mode === 'upload') {
                 const uploadInput = actionForm.querySelector('input[name="asset"]');
-                formData.append('asset', uploadInput.files[0]);
-                payload = await requestJSON(endpoints.uploadFile, formData);
+                const uploadFile = uploadInput.files[0];
+
+                if (!uploadFile) {
+                    throw new Error('Pilih file dulu.');
+                }
+
+                formData.append('asset', uploadFile);
+                const ext = String(uploadFile.name.split('.').pop() || '').toLowerCase();
+
+                if (ext === 'zip') {
+                    payload = await requestJSON(endpoints.uploadZip, formData);
+                    if (payload?.data?.import) {
+                        state.pendingImports.push(payload.data.import);
+                        renderPendingImports();
+                    }
+                } else {
+                    payload = await requestJSON(endpoints.uploadFile, formData);
+                    window.location.reload();
+                }
             }
 
             closeModal();
             showToast(payload.message);
-            window.location.reload();
         } catch (error) {
             showToast(error.message, 'error');
         }
@@ -814,6 +884,14 @@
     state.previewHeight = loadPreviewHeight();
     applyPreviewLayout();
     requestAnimationFrame(() => refreshPreviewSize());
+
+    treeRoot?.addEventListener('scroll', () => {
+        closeCreateMenu();
+    }, { passive: true });
+
+    document.addEventListener('scroll', () => {
+        positionCreateMenu();
+    }, { passive: true, capture: true });
 
     previewResizeHandle?.addEventListener('mousedown', (event) => {
         if (!state.previewEnabled) {
@@ -1153,6 +1231,7 @@
     };
 
     sidebarCollapseButton?.addEventListener('click', () => {
+        closeCreateMenu();
         state.sidebarCollapsed = !state.sidebarCollapsed;
         saveSidebarPreferences();
         applySidebarState();
@@ -1163,6 +1242,7 @@
             return;
         }
 
+        closeCreateMenu();
         state.sidebarCollapsed = false;
         saveSidebarPreferences();
         applySidebarState();
@@ -1181,6 +1261,43 @@
         }
 
         closeCreateMenu();
+    });
+
+    pendingImportList?.addEventListener('click', async (event) => {
+        const extractButton = event.target.closest('[data-extract-zip]');
+        const cancelButton = event.target.closest('[data-cancel-zip]');
+
+        if (!extractButton && !cancelButton) {
+            return;
+        }
+
+        const token = extractButton?.dataset.extractZip || cancelButton?.dataset.cancelZip;
+
+        if (!token) {
+            return;
+        }
+
+        try {
+            const formData = new FormData();
+            formData.set('id_project', projectId);
+            formData.set('token', token);
+
+            if (extractButton) {
+                const payload = await requestJSON(endpoints.extractZip, formData);
+                state.pendingImports = state.pendingImports.filter((item) => item.token !== token);
+                renderPendingImports();
+                showToast(payload.message);
+                window.location.reload();
+                return;
+            }
+
+            const payload = await requestJSON(endpoints.cancelZip, formData);
+            state.pendingImports = state.pendingImports.filter((item) => item.token !== token);
+            renderPendingImports();
+            showToast(payload.message);
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
     });
 
     document.addEventListener('click', (event) => {
@@ -1228,6 +1345,7 @@
         sidebar.style.width = nextWidth + 'px';
         requestAnimationFrame(() => {
             scheduleEditorLayout();
+            positionCreateMenu();
         });
     });
 
@@ -1255,6 +1373,7 @@
         requestAnimationFrame(() => {
             refreshPreviewSize();
             scheduleEditorLayout();
+            positionCreateMenu();
         });
     });
 
@@ -1289,6 +1408,7 @@
 
     loadSidebarPreferences();
     applySidebarState();
+    renderPendingImports();
 
     displayTree();
     renderTabs();

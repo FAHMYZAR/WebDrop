@@ -2,6 +2,8 @@
     const config = window.WebDropDashboard || {};
     const modal = document.getElementById('wd-create-modal');
     const confirmModal = document.getElementById('wd-confirm-modal');
+    const renameModal = document.getElementById('wd-rename-modal');
+    const renameForm = document.querySelector('[data-rename-form]');
     const toast = document.getElementById('wd-toast');
     const createButtons = Array.from(document.querySelectorAll('[data-create-project]'));
     const createForm = document.querySelector('[data-create-form]');
@@ -10,11 +12,13 @@
     const filterButtons = Array.from(document.querySelectorAll('[data-project-filter]'));
     const projectGrid = document.querySelector('[data-project-grid]');
     const deleteUrl = config.deleteUrl;
+    const renameUrl = config.renameUrl;
     let pendingDeleteId = null;
+    let pendingRenameId = null;
     let activeFilter = 'all';
     let activeSort = 'latest';
 
-    if (!modal || !confirmModal || !toast) {
+    if (!modal || !confirmModal || !renameModal || !renameForm || !toast) {
         return;
     }
 
@@ -122,6 +126,7 @@
     createButtons.forEach((button) => button.addEventListener('click', () => openModal(modal)));
     modal.querySelectorAll('[data-close-modal]').forEach((button) => button.addEventListener('click', () => closeModal(modal)));
     confirmModal.querySelectorAll('[data-close-confirm]').forEach((button) => button.addEventListener('click', () => closeModal(confirmModal)));
+    renameModal.querySelectorAll('[data-close-rename-modal]').forEach((button) => button.addEventListener('click', () => closeModal(renameModal)));
 
     document.addEventListener('click', (event) => {
         if (!event.target.closest('[data-project-menu-wrap]')) {
@@ -166,6 +171,26 @@
                 await copyText(publicUrl);
                 showToast('Link copied');
                 closeProjectMenus();
+                return;
+            }
+
+            const renameButton = event.target.closest('[data-rename-project]');
+            if (renameButton) {
+                const card = renameButton.closest('[data-project-card]');
+                const projectId = card?.dataset.projectId || null;
+                const currentName = card?.dataset.projectName || '';
+
+                closeProjectMenus();
+
+                if (!projectId) {
+                    return;
+                }
+
+                pendingRenameId = projectId;
+                renameForm.elements.id_project.value = projectId;
+                renameForm.elements.project_name.value = currentName;
+                openModal(renameModal);
+                requestAnimationFrame(() => renameForm.elements.project_name.focus());
                 return;
             }
 
@@ -264,6 +289,35 @@
         }
     });
 
+    renameForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        if (!pendingRenameId) {
+            closeModal(renameModal);
+            return;
+        }
+
+        const nextName = String(renameForm.elements.project_name.value || '').trim();
+        if (!nextName) {
+            showToast('Nama project wajib diisi.', 'error');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.set('id_project', pendingRenameId);
+        formData.set('project_name', nextName);
+
+        try {
+            const payload = await submitForm(renameUrl, formData);
+            closeModal(renameModal);
+            pendingRenameId = null;
+            showToast(payload.message);
+            window.location.reload();
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    });
+
     document.addEventListener('click', (event) => {
         if (event.target === modal) {
             closeModal(modal);
@@ -271,6 +325,10 @@
 
         if (event.target === confirmModal) {
             closeModal(confirmModal);
+        }
+
+        if (event.target === renameModal) {
+            closeModal(renameModal);
         }
     });
 

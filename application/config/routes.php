@@ -61,6 +61,7 @@ $route['dashboard'] = 'dashboard/index';
 
 $route['projects/create'] = 'projects/create';
 $route['projects/delete_project'] = 'projects/delete_project';
+$route['projects/rename_project'] = 'projects/rename_project';
 $route['projects/editor/(:num)'] = 'projects/editor/$1';
 $route['projects/(:any)'] = 'projects/show/$1';
 $route['project-files/get-file-content'] = 'ProjectFiles/get_file_content';
@@ -70,6 +71,9 @@ $route['project-files/create-folder'] = 'ProjectFiles/create_folder';
 $route['project-files/rename-file'] = 'ProjectFiles/rename_file';
 $route['project-files/delete-file'] = 'ProjectFiles/delete_file';
 $route['project-files/upload-file'] = 'ProjectFiles/upload_file';
+$route['project-files/upload-zip'] = 'ProjectFiles/upload_zip';
+$route['project-files/extract-zip'] = 'ProjectFiles/extract_zip';
+$route['project-files/cancel-zip-import'] = 'ProjectFiles/cancel_zip_import';
 $route['project-preview/(:num)'] = 'ProjectPreview/index/$1';
 $route['project-preview/(:num)/(.*)'] = 'ProjectPreview/index/$1/$2';
 $route['project-publish/(:num)'] = 'ProjectPublish/publish/$1';

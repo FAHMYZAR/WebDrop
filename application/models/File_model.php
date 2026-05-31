@@ -39,4 +39,30 @@ class File_model extends CI_Model
             ->get($this->table)
             ->row();
     }
+
+    public function totalSizeByProject($projectId)
+    {
+        $row = $this->db
+            ->select('COALESCE(SUM(file_size), 0) AS total_size', false)
+            ->where('id_project', (int) $projectId)
+            ->where('is_folder', 0)
+            ->get($this->table)
+            ->row();
+
+        return $row ? (int) $row->total_size : 0;
+    }
+
+    public function totalSizeByUser($userId)
+    {
+        $row = $this->db
+            ->select('COALESCE(SUM(f.file_size), 0) AS total_size', false)
+            ->from($this->table . ' f')
+            ->join('projects p', 'p.id_project = f.id_project', 'inner')
+            ->where('p.id_user', (int) $userId)
+            ->where('f.is_folder', 0)
+            ->get()
+            ->row();
+
+        return $row ? (int) $row->total_size : 0;
+    }
 }

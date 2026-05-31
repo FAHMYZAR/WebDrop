@@ -1,8 +1,9 @@
 <?php
 $createUrl = site_url('projects/create');
 $deleteUrl = site_url('projects/delete_project');
+$renameUrl = site_url('projects/rename_project');
 ?>
-<div id="wd-dashboard" data-create-url="<?php echo html_escape($createUrl); ?>" data-delete-url="<?php echo html_escape($deleteUrl); ?>" class="space-y-6 bg-white text-[#161616]">
+<div id="wd-dashboard" data-create-url="<?php echo html_escape($createUrl); ?>" data-delete-url="<?php echo html_escape($deleteUrl); ?>" data-rename-url="<?php echo html_escape($renameUrl); ?>" class="space-y-6 bg-white text-[#161616]">
     <section class="border border-[#e0e0e0] bg-white px-5 py-4 sm:px-6 lg:px-8">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0 space-y-2">
@@ -12,6 +13,21 @@ $deleteUrl = site_url('projects/delete_project');
             </div>
             <div class="flex items-center gap-2">
                 <button type="button" data-create-project class="inline-flex items-center gap-2 border border-[#0f62fe] bg-[#0f62fe] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0353e9]"><i data-lucide="plus" class="h-4 w-4"></i><span>Create Project</span></button>
+            </div>
+        </div>
+        <?php
+            $usageMb = (isset($account_usage_bytes) ? $account_usage_bytes : 0) / (1024 * 1024);
+            $limitMb = 100;
+            $percent = min(100, max(0, ($usageMb / $limitMb) * 100));
+            $isNearLimit = $percent > 90;
+        ?>
+        <div class="mt-6 border-t border-[#e0e0e0] pt-4">
+            <div class="flex items-center justify-between text-sm">
+                <span class="font-semibold text-[#161616]">Account Storage</span>
+                <span class="text-[#525252]"><?php echo number_format($usageMb, 2); ?> MB / <?php echo $limitMb; ?> MB</span>
+            </div>
+            <div class="mt-2 h-2 w-full overflow-hidden bg-[#e0e0e0]">
+                <div class="h-full <?php echo $isNearLimit ? 'bg-[#da1e28]' : 'bg-[#0f62fe]'; ?>" style="width: <?php echo $percent; ?>%;"></div>
             </div>
         </div>
     </section>
@@ -107,6 +123,7 @@ $deleteUrl = site_url('projects/delete_project');
                                         <a href="<?php echo html_escape($project->public_url); ?>" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-3 py-2 text-sm text-[#525252] hover:bg-[#f4f4f4] hover:text-[#161616]"><i data-lucide="external-link" class="h-4 w-4"></i><span>Open Site</span></a>
                                         <button type="button" data-copy-link class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#525252] hover:bg-[#f4f4f4] hover:text-[#161616]"><i data-lucide="copy" class="h-4 w-4"></i><span>Copy Link</span></button>
                                     <?php endif; ?>
+                                    <button type="button" data-rename-project class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#525252] hover:bg-[#f4f4f4] hover:text-[#161616]"><i data-lucide="pencil" class="h-4 w-4"></i><span>Rename</span></button>
                                     <button type="button" data-delete-project class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#da1e28] hover:bg-[#fff1f1]"><i data-lucide="trash-2" class="h-4 w-4"></i><span>Delete</span></button>
                                 </div>
                             </div>
@@ -151,12 +168,36 @@ $deleteUrl = site_url('projects/delete_project');
     </div>
 </div>
 
+<div id="wd-rename-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-[#161616]/20 px-4 py-6">
+    <div class="w-full max-w-md border border-[#e0e0e0] bg-white p-6">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <h2 class="text-lg font-semibold text-[#161616]">Rename Project</h2>
+                <p class="mt-1 text-sm text-[#525252]">Ubah nama project ini.</p>
+            </div>
+            <button type="button" data-close-rename-modal class="bg-[#f4f4f4] p-2 text-[#525252] hover:bg-[#e0e0e0]"><i data-lucide="x"></i></button>
+        </div>
+        <form class="mt-5 space-y-4" data-rename-form>
+            <input type="hidden" name="id_project" value="">
+            <label class="block text-sm font-medium text-[#161616]">
+                <span class="mb-1 block">Project name</span>
+                <input type="text" name="project_name" required maxlength="120" class="w-full border border-[#e0e0e0] bg-white px-4 py-3 text-sm outline-none ring-0 focus:border-[#0f62fe]">
+            </label>
+            <div class="flex items-center justify-end gap-3">
+                <button type="button" data-close-rename-modal class="border border-[#e0e0e0] px-4 py-2 text-sm font-semibold text-[#525252] hover:bg-[#f4f4f4]">Cancel</button>
+                <button type="submit" class="inline-flex items-center gap-2 border border-[#0f62fe] bg-[#0f62fe] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0353e9]"><i data-lucide="check"></i> Rename</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div id="wd-toast" class="fixed right-4 top-4 z-50 hidden border px-4 py-3 text-sm font-medium"></div>
 
 <script>
     window.WebDropDashboard = {
         createUrl: <?php echo json_encode($createUrl); ?>,
         deleteUrl: <?php echo json_encode($deleteUrl); ?>,
+        renameUrl: <?php echo json_encode($renameUrl); ?>,
         csrfName: <?php echo json_encode($this->security->get_csrf_token_name()); ?>,
         csrfHash: <?php echo json_encode($this->security->get_csrf_hash()); ?>,
     };
